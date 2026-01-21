@@ -1,0 +1,18 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Build outputs
+bin/
+obj/
+
+# Logs
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Publish folder (optional)
+publish/

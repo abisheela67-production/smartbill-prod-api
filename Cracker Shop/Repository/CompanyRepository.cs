@@ -1,0 +1,491 @@
+﻿using Cracker_Shop.Code_Generator;
+using Cracker_Shop.Models.CommonMasterModels;
+using Dapper;
+using System.Data;
+using System.Reflection;
+
+namespace Cracker_Shop.Repository
+{
+
+
+    public class CompanyRepository : ICompanyRepository
+    {
+        private readonly IDbConnection _db;
+
+        public CompanyRepository(IDbConnection db)
+        {
+            _db = db;
+        }
+
+        public async Task<long> SaveCompanyAsync(CompanyMaster company)
+        {
+            if (string.IsNullOrWhiteSpace(company.CompanyName))
+                throw new ArgumentException("CompanyName is required.");
+
+            if (company.CompanyID == 0)
+            {
+                company.CompanyCode = await CodeGenerator.GenerateNextCodeAsync(
+                    _db, "CompanyMaster", "CompanyCode", "COM", 5
+                );
+
+                var sqlInsert = @"INSERT INTO CompanyMaster
+            (CompanyCode, CompanyName, Phone, AlternatePhone, Email, Website,
+             AddressLine1, AddressLine2, AddressLine3, AddressLine4, City, State, Country, Pincode,
+             GSTNumber, PANNumber, CINNumber, BankName, BankAccountNumber, IFSCCode,
+             CompanyLogo, CompanyImage, IsActive, CreatedByUserID, CreatedSystemName)
+            VALUES
+             (@CompanyCode, @CompanyName, @Phone, @AlternatePhone, @Email, @Website,
+              @AddressLine1, @AddressLine2, @AddressLine3, @AddressLine4, @City, @State, @Country, @Pincode,
+              @GSTNumber, @PANNumber, @CINNumber, @BankName, @BankAccountNumber, @IFSCCode,
+              @CompanyLogo, @CompanyImage, @IsActive, @CreatedByUserID, @CreatedSystemName);
+            SELECT CAST(SCOPE_IDENTITY() as bigint);";
+
+                return await _db.ExecuteScalarAsync<long>(sqlInsert, company);
+            }
+            else if (!company.IsActive)
+            {
+                var sqlDelete = "UPDATE CompanyMaster SET IsActive=0, UpdatedAt=SYSDATETIME() WHERE CompanyID=@CompanyID";
+                await _db.ExecuteAsync(sqlDelete, new { company.CompanyID });
+                return company.CompanyID;
+            }
+            else
+            {
+                var sqlUpdate = @"UPDATE CompanyMaster SET
+                            CompanyName=@CompanyName,
+                            Phone=@Phone,
+                            AlternatePhone=@AlternatePhone,
+                            Email=@Email,
+                            Website=@Website,
+                            AddressLine1=@AddressLine1,
+                            AddressLine2=@AddressLine2,
+                            AddressLine3=@AddressLine3,
+                            AddressLine4=@AddressLine4,
+                            City=@City,
+                            State=@State,
+                            Country=@Country,
+                            Pincode=@Pincode,
+                            GSTNumber=@GSTNumber,
+                            PANNumber=@PANNumber,
+                            CINNumber=@CINNumber,
+                            BankName=@BankName,
+                            BankAccountNumber=@BankAccountNumber,
+                            IFSCCode=@IFSCCode,
+                            CompanyLogo=@CompanyLogo,
+                            CompanyImage=@CompanyImage,
+                            UpdatedByUserID=@UpdatedByUserID,
+                            UpdatedSystemName=@UpdatedSystemName,
+                            UpdatedAt=SYSDATETIME()
+                         WHERE CompanyID=@CompanyID";
+
+                await _db.ExecuteAsync(sqlUpdate, company);
+                return company.CompanyID;
+            }
+        }
+
+        public async Task<IEnumerable<CompanyMaster>> GetAllCompaniesAsync()
+        {
+            var sql = "SELECT * FROM CompanyMaster WHERE IsActive=1 ORDER BY CompanyName";
+            return await _db.QueryAsync<CompanyMaster>(sql);
+        }
+
+        public async Task<CompanyMaster?> GetCompanyByIdAsync(long companyId)
+        {
+            var sql = "SELECT * FROM CompanyMaster WHERE CompanyID=@CompanyID AND IsActive=1";
+            return await _db.QueryFirstOrDefaultAsync<CompanyMaster>(sql, new { CompanyID = companyId });
+        }
+        public async Task<long> SaveBranchAsync(BranchMaster branch)
+        {
+            if (string.IsNullOrWhiteSpace(branch.BranchName))
+                throw new ArgumentException("BranchName is required.");
+
+            if (branch.BranchID == 0)
+            {
+                // Generate BranchCode if needed (similar to Company)
+                branch.BranchCode = await CodeGenerator.GenerateNextCodeAsync(
+                    _db, "BranchMaster", "BranchCode", "BRN", 5
+                );
+
+                var sqlInsert = @"
+INSERT INTO BranchMaster
+(CompanyID, BranchCode, BranchName, Address, IsActive, CreatedByUserID, CreatedSystemName, CreatedAt)
+VALUES
+(@CompanyID, @BranchCode, @BranchName, @Address, @IsActive, @CreatedByUserID, @CreatedSystemName, SYSDATETIME());
+SELECT CAST(SCOPE_IDENTITY() AS bigint);
+";
+                return await _db.ExecuteScalarAsync<long>(sqlInsert, branch);
+            }
+            else if (!branch.IsActive)
+            {
+                // Soft delete
+                var sqlDelete = @"
+UPDATE BranchMaster
+SET IsActive=0, UpdatedAt=SYSDATETIME()
+WHERE BranchID=@BranchID
+";
+                await _db.ExecuteAsync(sqlDelete, new { branch.BranchID });
+                return branch.BranchID;
+            }
+            else
+            {
+                // Update branch
+                var sqlUpdate = @"
+UPDATE BranchMaster
+SET 
+    BranchName=@BranchName,
+    Address=@Address,
+    UpdatedByUserID=@UpdatedByUserID,
+    UpdatedSystemName=@UpdatedSystemName,
+    UpdatedAt=SYSDATETIME()
+WHERE BranchID=@BranchID
+";
+                await _db.ExecuteAsync(sqlUpdate, branch);
+                return branch.BranchID;
+            }
+        }
+        public async Task<BranchMaster?> GetBranchByIdAsync(long branchId)
+        {
+            var sql = "SELECT * FROM BranchMaster WHERE BranchID=@BranchID";
+            return await _db.QueryFirstOrDefaultAsync<BranchMaster>(sql, new { BranchID = branchId });
+        }
+        public async Task<IEnumerable<BranchMaster>> GetBranchesByCompanyAsync(long companyId)
+        {
+            var sql = "SELECT * FROM BranchMaster WHERE CompanyID=@CompanyID AND IsActive=1";
+            return await _db.QueryAsync<BranchMaster>(sql, new { CompanyID = companyId });
+        }
+
+        public async Task<IEnumerable<BranchMaster>> GetAllBranchesAsync()
+        {
+            var sql = "SELECT * FROM BranchMaster WHERE IsActive=1";
+            return await _db.QueryAsync<BranchMaster>(sql);
+        }
+        public async Task<long> SaveDepartmentAsync(DepartmentMaster department)
+        {
+            if (string.IsNullOrWhiteSpace(department.DepartmentName))
+                throw new ArgumentException("DepartmentName is required.");
+
+            if (department.DepartmentID == 0)
+            {
+                // Generate DepartmentCod
+                department.DepartmentCode = await CodeGenerator.GenerateNextCodeAsync(
+                    _db, "DepartmentMaster", "DepartmentCode", "DEP", 5
+                );
+
+                var sqlInsert = @"
+INSERT INTO DepartmentMaster
+(BranchID, DepartmentCode, DepartmentName, IsActive, CreatedByUserID, CreatedSystemName, CreatedAt)
+VALUES
+(@BranchID, @DepartmentCode, @DepartmentName, @IsActive, @CreatedByUserID, @CreatedSystemName, SYSDATETIME());
+SELECT CAST(SCOPE_IDENTITY() AS bigint);
+";
+                return await _db.ExecuteScalarAsync<long>(sqlInsert, department);
+            }
+            else if (!department.IsActive)
+            {
+                var sqlDelete = "UPDATE DepartmentMaster SET IsActive=0, UpdatedAt=SYSDATETIME() WHERE DepartmentID=@DepartmentID";
+                await _db.ExecuteAsync(sqlDelete, new { department.DepartmentID });
+                return department.DepartmentID;
+            }
+            else
+            {
+                var sqlUpdate = @"
+UPDATE DepartmentMaster
+SET 
+    DepartmentName=@DepartmentName,
+    UpdatedByUserID=@UpdatedByUserID,
+    UpdatedSystemName=@UpdatedSystemName,
+    UpdatedAt=SYSDATETIME()
+WHERE DepartmentID=@DepartmentID
+";
+                await _db.ExecuteAsync(sqlUpdate, department);
+                return department.DepartmentID;
+            }
+        }
+        public async Task<IEnumerable<DepartmentMaster>> GetAllDepartmentsAsync()
+        {
+            var sql = "SELECT * FROM DepartmentMaster WHERE IsActive=1";
+            return await _db.QueryAsync<DepartmentMaster>(sql);
+        }
+
+
+            public async Task<long> SaveRoleAsync(RoleMaster role)
+            {
+                if (string.IsNullOrWhiteSpace(role.RoleName))
+                    throw new ArgumentException("RoleName is required.");
+
+                if (role.RoleID == 0)
+                {
+                    // Generate RoleCode
+                    role.RoleCode = await CodeGenerator.GenerateNextCodeAsync(_db, "RoleMaster", "RoleCode", "ROL", 5);
+
+                    var sqlInsert = @"
+INSERT INTO RoleMaster
+(RoleCode, RoleName, IsActive, CreatedByUserID, CreatedSystemName, CreatedAt)
+VALUES
+(@RoleCode, @RoleName, @IsActive, @CreatedByUserID, @CreatedSystemName, SYSDATETIME());
+SELECT CAST(SCOPE_IDENTITY() AS bigint);";
+                    return await _db.ExecuteScalarAsync<long>(sqlInsert, role);
+                }
+                else if (!role.IsActive)
+                {
+                    var sqlDelete = "UPDATE RoleMaster SET IsActive=0, UpdatedAt=SYSDATETIME() WHERE RoleID=@RoleID";
+                    await _db.ExecuteAsync(sqlDelete, new { role.RoleID });
+                    return role.RoleID;
+                }
+                else
+                {
+                    var sqlUpdate = @"
+UPDATE RoleMaster
+SET RoleName=@RoleName,
+    UpdatedByUserID=@UpdatedByUserID,
+    UpdatedSystemName=@UpdatedSystemName,
+    UpdatedAt=SYSDATETIME()
+WHERE RoleID=@RoleID";
+                    await _db.ExecuteAsync(sqlUpdate, role);
+                    return role.RoleID;
+                }
+            }
+
+            public async Task<IEnumerable<RoleMaster>> GetAllRolesAsync()
+            {
+                var sql = "SELECT * FROM RoleMaster WHERE IsActive=1";
+                return await _db.QueryAsync<RoleMaster>(sql);
+            }
+        
+
+            public async Task<long> SaveUserAsync(UserMaster user)
+            {
+                if (string.IsNullOrWhiteSpace(user.UserName))
+                    throw new ArgumentException("UserName is required.");
+
+                if (user.UserID == 0)
+                {
+                    var sqlInsert = @"
+INSERT INTO UserMaster
+(CompanyID, BranchID, DepartmentID, RoleID, UserName, Email, PasswordHash, IsActive, CreatedByUserID, CreatedSystemName, CreatedAt)
+VALUES
+(@CompanyID, @BranchID, @DepartmentID, @RoleID, @UserName, @Email, @PasswordHash, @IsActive, @CreatedByUserID, @CreatedSystemName, SYSDATETIME());
+SELECT CAST(SCOPE_IDENTITY() AS bigint);";
+                    return await _db.ExecuteScalarAsync<long>(sqlInsert, user);
+                }
+                else if (!user.IsActive)
+                {
+                    var sqlDelete = "UPDATE UserMaster SET IsActive=0, UpdatedAt=SYSDATETIME() WHERE UserID=@UserID";
+                    await _db.ExecuteAsync(sqlDelete, new { user.UserID });
+                    return user.UserID;
+                }
+                else
+                {
+                    var sqlUpdate = @"
+UPDATE UserMaster
+SET CompanyID=@CompanyID,
+    BranchID=@BranchID,
+    DepartmentID=@DepartmentID,
+    RoleID=@RoleID,
+    UserName=@UserName,
+    Email=@Email,
+    PasswordHash=@PasswordHash,
+    UpdatedByUserID=@UpdatedByUserID,
+    UpdatedSystemName=@UpdatedSystemName,
+    UpdatedAt=SYSDATETIME()
+WHERE UserID=@UserID";
+                    await _db.ExecuteAsync(sqlUpdate, user);
+                    return user.UserID;
+                }
+            }
+
+            public async Task<IEnumerable<UserMaster>> GetAllUsersAsync()
+            {
+                var sql = "SELECT * FROM UserMaster WHERE IsActive=1";
+                return await _db.QueryAsync<UserMaster>(sql);
+            }
+
+        public async Task<long> SavePermissionAsync(UserRolePermission permission)
+        {
+            // Check if a row already exists for this user
+            var existing = await _db.QueryFirstOrDefaultAsync<long?>(
+                "SELECT ID FROM UserModulePermission WHERE UserID=@UserID",
+                new { permission.UserID }
+            );
+
+            if (existing.HasValue)
+            {
+                // Update existing row
+                var sqlUpdate = @"
+UPDATE UserModulePermission
+SET ModuleID=@ModuleID,
+    RoleID=@RoleID,
+    UpdatedAt=SYSDATETIME()
+WHERE ID=@ID";
+
+                permission.ID = existing.Value;
+                await _db.ExecuteAsync(sqlUpdate, permission);
+                return permission.ID;
+            }
+            else
+            {
+                // Insert new row
+                var sqlInsert = @"
+INSERT INTO UserModulePermission
+(UserID, RoleID, ModuleID, CreatedAt)
+VALUES
+(@UserID, @RoleID, @ModuleID, SYSDATETIME());
+SELECT CAST(SCOPE_IDENTITY() AS bigint);";
+
+                return await _db.ExecuteScalarAsync<long>(sqlInsert, permission);
+            }
+        }
+
+
+        public async Task DeletePermissionAsync(long id)
+        {
+            var sqlDelete = "DELETE FROM UserModulePermission WHERE ID=@ID";
+            await _db.ExecuteAsync(sqlDelete, new { ID = id });
+        }
+
+        public async Task<IEnumerable<UserRolePermission>> GetPermissionsByRoleAsync(int roleId)
+        {
+            var sql = "SELECT * FROM UserModulePermission WHERE RoleID=@RoleID";
+            return await _db.QueryAsync<UserRolePermission>(sql, new { RoleID = roleId });
+        }
+        public async Task<IEnumerable<ModuleDto>> GetModulesByUserAsync(int userId)
+        {
+            var sql = "SELECT ModuleID FROM UserModulePermission WHERE UserID=@UserID";
+            var userPerm = await _db.QueryFirstOrDefaultAsync<UserRolePermission>(sql, new { UserID = userId });
+
+            if (userPerm == null || string.IsNullOrEmpty(userPerm.ModuleID))
+                return new List<ModuleDto>();
+
+            var moduleIds = userPerm.ModuleID.Split(',').Select(id => int.Parse(id)).ToList();
+            var modulesSql = "SELECT * FROM Module WHERE ModuleID IN @Ids";
+            var modules = await _db.QueryAsync<ModuleDto>(modulesSql, new { Ids = moduleIds });
+
+            return modules;
+        }
+
+
+        public async Task<IEnumerable<ModuleDto>> GetAllModulesAsync()
+        {
+            var sql = "SELECT * FROM Module WHERE IsActive=1 ORDER BY Label";
+            return await _db.QueryAsync<ModuleDto>(sql);
+        }
+        public async Task<ModuleDto?> GetModuleByIdAsync(long moduleId)
+        {
+            var sql = "SELECT ModuleID, Label, Route, Icon, IsActive FROM Module WHERE ModuleID=@ModuleID";
+            return await _db.QueryFirstOrDefaultAsync<ModuleDto>(sql, new { ModuleID = moduleId });
+        }
+
+
+        public async Task<long> SaveModuleAsync(ModuleDto module)
+        {
+            if (module.ModuleID == 0)
+            {
+                var sqlInsert = @"
+INSERT INTO Module (Label, Route, Icon, IsActive)
+VALUES (@Label, @Route, @Icon, @IsActive);
+SELECT CAST(SCOPE_IDENTITY() AS bigint);";
+                return await _db.ExecuteScalarAsync<long>(sqlInsert, module);
+            }
+            else
+            {
+                var sqlUpdate = @"
+UPDATE Module
+SET Label=@Label, Route=@Route, Icon=@Icon, IsActive=@IsActive
+WHERE ModuleID=@ModuleID";
+                await _db.ExecuteAsync(sqlUpdate, module);
+                return module.ModuleID;
+            }
+        }
+
+
+        public async Task<RegisterResultDto> RegisterCompanyAsync(RegisterRequestDto request)
+        {
+            var parameters = new DynamicParameters();
+
+            parameters.Add("@CompanyName", request.CompanyName);
+            parameters.Add("@CompanyEmail", request.CompanyEmail);
+            parameters.Add("@Phone", request.Phone);
+
+            parameters.Add("@UserName", request.UserName);
+            parameters.Add("@UserEmail", request.UserEmail);
+            parameters.Add("@PasswordHash", request.PasswordHash);
+
+            var result = await _db.QueryFirstAsync<RegisterResultDto>(
+                "sp_Register_Normal",
+                parameters,
+                commandType: CommandType.StoredProcedure
+            );
+
+            return result;
+        }
+
+        public async Task<CompanyDashboardResponseDto> GetCompanyDashboardAsync(
+    int companyId,
+    DateTime fromDate,
+    DateTime toDate
+)
+        {
+            var parameters = new DynamicParameters();
+            parameters.Add("@CompanyID", companyId, DbType.Int32);
+            parameters.Add("@FromDate", fromDate.Date, DbType.Date);
+            parameters.Add("@ToDate", toDate.Date, DbType.Date);
+
+            using var multi = await _db.QueryMultipleAsync(
+                "sp_CommonDashboard_WithBranchCount",
+                parameters,
+                commandType: CommandType.StoredProcedure
+            );
+
+            var dashboard = await multi.ReadFirstOrDefaultAsync<CompanyDashboardDto>();
+            var branchCount = await multi.ReadFirstOrDefaultAsync<BranchCountDto>();
+
+            return new CompanyDashboardResponseDto
+            {
+                Dashboard = dashboard ?? new CompanyDashboardDto(),
+                ActiveBranchCount = branchCount?.ActiveBranchCount ?? 0
+            };
+        }
+
+        public async Task<long> SaveDemoRequestAsync(DemoRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.CustomerName))
+                throw new ArgumentException("CustomerName is required");
+
+            if (request.RequestID == 0)     
+            {
+                var sqlInsert = @"
+INSERT INTO DemoRequest
+(CustomerName, CompanyName, Email, Phone, SoftwareName, TrialDays, DemoStatus, Remarks,
+ IsActive, CreatedByUserID, CreatedSystemName, CreatedAt)
+VALUES
+(@CustomerName, @CompanyName, @Email, @Phone, @SoftwareName, @TrialDays, @DemoStatus, @Remarks,
+ @IsActive, @CreatedByUserID, @CreatedSystemName, SYSDATETIME());
+
+SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
+";
+
+                return await _db.ExecuteScalarAsync<long>(sqlInsert, request);
+            }
+            else
+            {
+                var sqlUpdate = @"
+UPDATE DemoRequest
+SET CustomerName=@CustomerName,
+    CompanyName=@CompanyName,
+    Email=@Email,
+    Phone=@Phone,
+    SoftwareName=@SoftwareName,
+    TrialDays=@TrialDays,
+    DemoStatus=@DemoStatus,
+    Remarks=@Remarks,
+    UpdatedByUserID=@UpdatedByUserID,
+    UpdatedSystemName=@UpdatedSystemName,
+    UpdatedAt=SYSDATETIME()
+WHERE RequestID=@RequestID";
+
+                await _db.ExecuteAsync(sqlUpdate, request);
+                return request.RequestID;
+            }
+        }
+
+    }
+}
