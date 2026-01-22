@@ -133,7 +133,7 @@
     public class InvoiceSaveResult
     {
         public int InvoiceID { get; set; }
-        public string InvoiceNumber { get; set; }
+        public string? InvoiceNumber { get; set; }
     }
 
     public class ProductStockPriceDto
@@ -152,27 +152,27 @@
     {
         public int BusinessTypeID { get; set; }
         public int? CompanyID { get; set; }
-        public string BusinessTypeName { get; set; }
-        public string Description { get; set; }
+        public string ?BusinessTypeName { get; set; }
+        public string? Description { get; set; }
         public bool IsActive { get; set; }
         public int? CreatedBy { get; set; }
         public DateTime? CreatedDate { get; set; }
         public int? UpdatedBy { get; set; }
         public DateTime? UpdatedDate { get; set; }
-        public string CreatedSystemName { get; set; }
+        public string?CreatedSystemName { get; set; }
     }
 
     public class GstTransactionType
     {
         public int GstTransactionTypeID { get; set; }
-        public string TransactionTypeName { get; set; }
-        public string Description { get; set; }
+        public string?TransactionTypeName { get; set; }
+        public string?Description { get; set; }
         public bool IsActive { get; set; }
         public int? CreatedBy { get; set; }
         public DateTime? CreatedDate { get; set; }
         public int? UpdatedBy { get; set; }
         public DateTime? UpdatedDate { get; set; }
-        public string CreatedSystemName { get; set; }
+        public string?CreatedSystemName { get; set; }
     }
 
 
