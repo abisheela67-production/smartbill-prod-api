@@ -1,4 +1,4 @@
-name: Deploy API to IIS
+name: Deploy API to IIS (Production)
 
 on:
   push:
@@ -31,16 +31,23 @@ jobs:
       shell: powershell
       run: |
         Import-Module WebAdministration
-        Stop-WebSite "smartbillpro-api"
+        if (Test-Path "IIS:\Sites\SmartBillApiProd") {
+          Stop-WebSite "SmartBillApiProd"
+        }
 
     - name: Copy files to IIS
       shell: powershell
       run: |
-        Remove-Item "C:\inetpub\CrackerShopAPI\publish\*" -Recurse -Force -ErrorAction SilentlyContinue
-        Copy-Item "publish\*" "C:\inetpub\CrackerShopAPI\publish" -Recurse -Force
+        $dest = "C:\inetpub\SmartBillApiProd"
+        if (!(Test-Path $dest)) {
+          New-Item -ItemType Directory -Path $dest
+        }
+
+        Remove-Item "$dest\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item "publish\*" $dest -Recurse -Force
 
     - name: Start IIS site
       shell: powershell
       run: |
         Import-Module WebAdministration
-        Start-WebSite "smartbillpro-api"
+        Start-WebSite "SmartBillApiProd"
