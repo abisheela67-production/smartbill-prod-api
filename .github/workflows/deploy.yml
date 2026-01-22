@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: [self-hosted, Windows, X64]
 
     steps:
     - name: Checkout source
@@ -28,16 +28,19 @@ jobs:
       run: dotnet publish -c Release -o publish
 
     - name: Stop IIS site
+      shell: powershell
       run: |
         Import-Module WebAdministration
         Stop-WebSite "smartbillpro-api"
 
     - name: Copy files to IIS
+      shell: powershell
       run: |
-        Remove-Item "C:\inetpub\smartbillpro-api\publish\*" -Recurse -Force
-        Copy-Item "publish\*" "C:\inetpub\smartbillpro-api\publish" -Recurse -Force
+        Remove-Item "C:\inetpub\CrackerShopAPI\publish\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item "publish\*" "C:\inetpub\CrackerShopAPI\publish" -Recurse -Force
 
     - name: Start IIS site
+      shell: powershell
       run: |
         Import-Module WebAdministration
         Start-WebSite "smartbillpro-api"
