@@ -33,7 +33,7 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
-
+//httpdirection
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
